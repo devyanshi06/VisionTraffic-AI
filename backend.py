@@ -5,17 +5,13 @@ import torch
 
 class TrafficAnalyticsEngine:
     def __init__(self, video_source="traffic.mp4"):
-        # Initialize YOLOv8 Nano
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = YOLO("yolov8n.pt") 
         if self.device == "cuda":
             self.model.to(self.device)
         
-        # Establish video reader hook
         self.cap = cv2.VideoCapture(video_source)
-        
-        # Tracking logic persistent attributes
-        self.tracked_vehicle_ids = set()
+        self.counted_footprints = []
         self.total_passed_count = 0
         self.frame_counter = 0
 
@@ -23,7 +19,6 @@ class TrafficAnalyticsEngine:
         if not self.cap.isOpened():
             return None
 
-        # ⚡ FIXED TYPO: Replaced cv2.read(cap) with standard cap.read()
         ret, frame = self.cap.read()
         if not ret:
             self.cap.release()
@@ -31,50 +26,59 @@ class TrafficAnalyticsEngine:
 
         self.frame_counter += 1
         height, width, _ = frame.shape
-        # Establish the blue gate line right across the horizontal center matrix
-        counting_line_y = int(height * 0.5)
+        
+        # 🚀 MOVING GATES NORTH & SPACING THEM FOR TWO LANES
+        line_north_y = int(height * 0.40) # Line 1 (Further up the screen)
+        line_south_y = int(height * 0.55) # Line 2 (Second Lane)
 
-        # Leverage ByteTrack algorithm to map top-down roofs securely
-        results = self.model.track(
+        results = self.model.predict(
             frame, 
             classes=[2, 3, 5, 7], 
             conf=conf_threshold, 
-            persist=True, 
-            tracker="bytetrack.yaml", 
+            imgsz=640,
             device=self.device,
             verbose=False
         )
 
-        # Check if active trackers exist in current frame processing arrays
-        if results[0].boxes.id is not None:
-            boxes = results[0].boxes.xyxy.cpu().numpy()
-            track_ids = results[0].boxes.id.cpu().numpy().astype(int)
+        self.counted_footprints = [f for f in self.counted_footprints if self.frame_counter - f[2] < 30]
 
-            for box, track_id in zip(boxes, track_ids):
+        if results[0].boxes is not None:
+            boxes = results[0].boxes.xyxy.cpu().numpy()
+
+            for box in boxes:
                 x1, y1, x2, y2 = box
                 cx = int((x1 + x2) / 2)
                 cy = int((y1 + y2) / 2)
 
-                # Overlay target track marker dot
+                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
                 cv2.circle(frame, (cx, cy), 5, (0, 255, 255), -1)
 
-                # Threshold window check area (15 pixels buffer) to avoid skipping fast vehicle updates
-                if abs(cy - counting_line_y) < 15:
-                    if track_id not in self.tracked_vehicle_ids:
-                        self.tracked_vehicle_ids.add(track_id)
+                # ⚡ CHECK BOTH GATES IN A SINGLE PASS
+                is_near_gate_1 = abs(cy - line_north_y) < 35
+                is_near_gate_2 = abs(cy - line_south_y) < 35
+
+                if is_near_gate_1 or is_near_gate_2:
+                    already_logged = False
+                    for past_cx, past_cy, _ in self.counted_footprints:
+                        distance = np.hypot(cx - past_cx, cy - past_cy)
+                        if distance < 50:
+                            already_logged = True
+                            break
+                    
+                    if not already_logged:
                         self.total_passed_count += 1
+                        self.counted_footprints.append((cx, cy, self.frame_counter))
 
-        # Generate the standard background box visualization elements
-        annotated_frame = results[0].plot() if results[0].boxes.id is not None else frame
+        # 🎨 RENDER BOTH BOUNDARY TELEMETRY LINES
+        cv2.line(frame, (0, line_north_y), (width, line_north_y), (255, 0, 0), 3) # Lane 1
+        cv2.line(frame, (0, line_south_y), (width, line_south_y), (255, 0, 0), 3) # Lane 2
         
-        # Superimpose the physical Gate Line marker
-        cv2.line(annotated_frame, (0, counting_line_y), (width, counting_line_y), (255, 0, 0), 3)
+        cv2.putText(frame, "LANE 1 - NORTH GATE", (20, line_north_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
+        cv2.putText(frame, "LANE 2 - SOUTH GATE", (20, line_south_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
 
-        # Scale down image dimensions slightly for hyper-smooth web rendering transfer
-        display_frame = cv2.resize(annotated_frame, (720, 405))
+        display_frame = cv2.resize(frame, (720, 405))
         rgb_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
 
-        # 🚀 Return the analytical package data back to your friend's app.py frontend
         return {
             "frame": rgb_frame,
             "count": self.total_passed_count,
