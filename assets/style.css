@@ -1,1 +1,27 @@
+.block-container{
+    padding-top:1rem;
+    padding-bottom:2rem;
+}
 
+[data-testid="stMetric"]{
+    background:#1f2937;
+    border-radius:15px;
+    padding:20px;
+    border:1px solid #374151;
+}
+
+h1{
+    color:#60a5fa;
+}
+
+h3{
+    color:#e5e7eb;
+}
+
+section[data-testid="stSidebar"]{
+    background:#111827;
+}
+
+.stAlert{
+    border-radius:12px;
+}
