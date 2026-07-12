@@ -1,107 +1,100 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
 
-# -----------------------
-# Page Configuration
-# -----------------------
+from components.sidebar import render_sidebar
+from components.metrics import render_metrics
+from components.charts import render_charts
+
+from utils.mock_data import get_dashboard_data
+
 
 st.set_page_config(
     page_title="VisionTraffic AI",
     page_icon="🚦",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# -----------------------
-# Sidebar
-# -----------------------
+camera = render_sidebar()
 
-st.sidebar.title("🚦 VisionTraffic AI")
+data = get_dashboard_data()
 
-camera = st.sidebar.selectbox(
-    "Select Camera",
-    [
-        "Intersection A",
-        "Intersection B",
-        "Highway",
-        "City Center"
-    ]
-)
+vehicle_count = data["vehicle_count"]
+traffic_status = data["traffic_status"]
+average_speed = data["average_speed"]
+alerts = data["alerts"]
 
-st.sidebar.success("System Online")
+st.title("🚦 VisionTraffic AI")
 
-st.sidebar.markdown("---")
+st.markdown("""
+### Smart Transport Operations Dashboard
 
-st.sidebar.write("### Current Status")
-
-st.sidebar.write("🟢 Camera Connected")
-st.sidebar.write("🟢 AI Detection Running")
-st.sidebar.write("🟢 Dashboard Active")
-
-# -----------------------
-# Main Heading
-# -----------------------
-
-st.title("🚦 Smart Transport Operations Dashboard")
-
-st.write("Real-time traffic monitoring powered by AI")
+Monitor city traffic in real time using AI-powered vehicle detection and analytics.
+""")
 
 st.divider()
 
-# -----------------------
-# Metric Cards
-# -----------------------
-
-col1, col2, col3, col4 = st.columns(4)
-
-col1.metric("Vehicles", "142", "+12")
-
-col2.metric("Congestion", "Medium")
-
-col3.metric("Average Speed", "46 km/h")
-
-col4.metric("Emergency Alerts", "1")
+render_metrics(
+    vehicle_count,
+    traffic_status,
+    average_speed,
+    alerts
+)
 
 st.divider()
 
-# -----------------------
-# Main Layout
-# -----------------------
-
-left, right = st.columns([2,1])
+left, center, right = st.columns([2.3, 1.2, 1])
 
 with left:
 
-    st.subheader("📷 Live Camera Feed")
+    st.subheader("📹 Live Camera Feed")
 
-    st.info("YOLO processed video will appear here.")
+    st.info("Backend will stream processed YOLO video here.")
 
     st.image(
-        "https://placehold.co/900x500?text=Traffic+Camera+Feed",
+        "assets/traffic_placeholder.jpg",
         use_container_width=True
     )
 
+with center:
+
+    render_charts()
+
 with right:
 
-    st.subheader("Traffic Analytics")
+    st.subheader("🚨 Live Alerts")
 
-    df = pd.DataFrame(
-        np.random.randint(20,80,(20,2)),
-        columns=["Lane A","Lane B"]
-    )
+    st.success("Signal timings optimized")
 
-    st.line_chart(df)
+    st.warning("Heavy traffic near Junction A")
 
-    st.subheader("Traffic Status")
+    st.info("Emergency lane clear")
 
-    st.success("Traffic is flowing normally.")
+    st.error("Accident reported near NH-27")
 
 st.divider()
 
-st.subheader("🚨 Recent Alerts")
+st.subheader("🤖 AI Recommendations")
 
-st.warning("Heavy traffic detected near Junction 3.")
+c1, c2 = st.columns(2)
 
-st.info("Signal optimization activated.")
+with c1:
 
-st.error("Emergency vehicle detected on Highway.")
+    st.success("✅ Divert traffic to Ring Road.")
+
+    st.success("✅ Increase green signal by 15 seconds.")
+
+    st.success("✅ Prioritize ambulance route.")
+
+with c2:
+
+    st.info("Traffic expected to increase after 6 PM.")
+
+    st.info("Construction work causing slow movement.")
+
+    st.info("Alternate route updated.")
+
+st.divider()
+
+st.caption(
+    "VisionTraffic AI • Built using Streamlit + YOLOv8"
+)
